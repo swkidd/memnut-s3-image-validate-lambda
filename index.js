@@ -7,11 +7,12 @@ const s3 = new aws.S3({ apiVersion: '2006-03-01' });
 
 const dynamo = new aws.DynamoDB.DocumentClient();
 const MARKER_DB = "memnut-markers"
+const MEMAGE_DB = "memnut-memages"
 const MEM_DB = "memnut-mems"
 const VALID_BUCKET = "memnut-valid-images"
 
 const validMimeType = type => type === "image/jpeg" || type === "image/png" || type === "image/webp"
-const validType = type => type === "marker" || type === "mem"
+const validType = type => type === "marker" || type === "mem" || type === "memage"
 
 exports.handler = async event => {
   const bucket = event.Records[0].s3.bucket.name;
@@ -25,9 +26,7 @@ exports.handler = async event => {
     const { ContentType, Body, Metadata } = await s3.getObject(params).promise();
 
     const image_id = uuidv4()
-    const markerid = Metadata.markerid
     const type = Metadata.type
-    const latlng = JSON.parse(Metadata.latlng)
     const creator = JSON.parse(Metadata.creator)
 
     const mimeType = await fileType.fromBuffer(Body);
@@ -49,8 +48,8 @@ exports.handler = async event => {
       // const image_key_sm = `${image_id}_sm.webp`
 
       const webp_image = await sharp(raw_img)
-          .webp()
-          .toBuffer()
+        .webp()
+        .toBuffer()
 
       const promises = []
 
@@ -86,6 +85,8 @@ exports.handler = async event => {
       await Promise.all(promises)
 
       if (type === "marker") {
+        const markerid = Metadata.markerid
+        const latlng = JSON.parse(Metadata.latlng)
         const getResp = await dynamo
           .get({
             TableName: MARKER_DB,
@@ -93,7 +94,7 @@ exports.handler = async event => {
               id: markerid
             }
           })
-        .promise();
+          .promise();
 
         if (getResp.Item) {
           const marker = getResp.Item
@@ -123,7 +124,21 @@ exports.handler = async event => {
             })
             .promise();
         }
+      } else if (type === "memage") {
+        const item = {
+          id: uuidv4(),
+          image_keys: [image_key],
+          creator,
+          email: key,
+        }
+        await dynamo
+          .put({
+            TableName: MEMAGE_DB,
+            Item: item
+          })
+          .promise();
       } else if (type === "mem") {
+        const markerid = Metadata.markerid
         const item = {
           id: uuidv4(),
           marker_id: markerid,

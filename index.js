@@ -7,9 +7,11 @@ const s3 = new aws.S3({ apiVersion: '2006-03-01' });
 
 const dynamo = new aws.DynamoDB.DocumentClient();
 const MARKER_DB = "memnut-markers"
+const MEM_DB = "memnut-mems"
 const VALID_BUCKET = "memnut-valid-images"
 
-const validType = type => type === "image/jpeg" || type === "image/png" || type === "image/webp"
+const validMimeType = type => type === "image/jpeg" || type === "image/png" || type === "image/webp"
+const validType = type => type === "marker" || type === "mem"
 
 exports.handler = async event => {
   const bucket = event.Records[0].s3.bucket.name;
@@ -24,91 +26,114 @@ exports.handler = async event => {
 
     const image_id = uuidv4()
     const markerid = Metadata.markerid
+    const type = Metadata.type
     const latlng = JSON.parse(Metadata.latlng)
     const creator = JSON.parse(Metadata.creator)
 
-    const type = await fileType.fromBuffer(Body);
-    if (!validType(ContentType) || !validType(type.mime)) {
+    const mimeType = await fileType.fromBuffer(Body);
+    if (!validMimeType(ContentType) || !validMimeType(mimeType.mime)) {
       throw new Error('Invalid upload mime type');
+    } else if (!validType(type)) {
+      throw new Error('Invalid upload type');
     } else {
 
       var getparams = {
         Bucket: bucket,
         Key: key,
       }
-      const raw_img = await s3.getobject(getparams).promise();
+      const getresp = await s3.getObject(getparams).promise();
+      const raw_img = getresp.Body
 
       const image_key = `${image_id}.webp`
-      const image_key_md = `${image_id}_md.webp`
-      const image_key_sm = `${image_id}_sm.webp`
+      // const image_key_md = `${image_id}_md.webp`
+      // const image_key_sm = `${image_id}_sm.webp`
 
-      await s3.putObject({
+      const webp_image = await sharp(raw_img)
+          .webp()
+          .toBuffer()
+
+      const promises = []
+
+      promises.push(s3.putObject({
         Bucket: VALID_BUCKET,
         Key: image_key,
-        Body: await sharp(raw_img)
-          .webp({ lossless: true })
-          .toBuffer(),
+        Body: webp_image,
         ContentType: 'image/webp'
-      }).promise();
+      }).promise());
 
-      await s3.putObject({
-        Bucket: VALID_BUCKET,
-        Key: image_key_md,
-        Body: await sharp(raw_img)
-          .resize(350, undefined, {
-            fit: sharp.fit.cover,
-          })
-          .webp()
-          .toBuffer(),
-        ContentType: 'image/webp'
-      }).promise();
+      // promises.push(s3.putObject({
+      //   Bucket: VALID_BUCKET,
+      //   Key: image_key_md,
+      //   Body: await sharp(webp_image)
+      //     .resize(350, undefined, {
+      //       fit: sharp.fit.cover,
+      //     })
+      //     .toBuffer(),
+      //   ContentType: 'image/webp'
+      // }).promise());
 
-      await s3.putObject({
-        Bucket: VALID_BUCKET,
-        Key: image_key_sm,
-        Body: await sharp(raw_img)
-          .resize(200, 200, {
-            fit: sharp.fit.cover,
-          })
-          .webp()
-          .toBuffer(),
-        ContentType: 'image/webp'
-      }).promise();
+      // promises.push(s3.putObject({
+      //   Bucket: VALID_BUCKET,
+      //   Key: image_key_sm,
+      //   Body: await sharp(webp_image)
+      //     .resize(200, 200, {
+      //       fit: sharp.fit.cover,
+      //     })
+      //     .toBuffer(),
+      //   ContentType: 'image/webp'
+      // }).promise());
 
+      await Promise.all(promises)
 
-      const getResp = await dynamo
-        .get({
-          TableName: MARKER_DB,
-          Key: {
-            id: markerid
-          }
-        })
-      .promise();
-
-      if (getResp.Item) {
-        const marker = getResp.Item
-        const item = {
-          ...marker,
-          image_keys: [...marker.image_keys, image_key]
-        }
-
-        await dynamo
-          .put({
+      if (type === "marker") {
+        const getResp = await dynamo
+          .get({
             TableName: MARKER_DB,
-            Item: item
+            Key: {
+              id: markerid
+            }
           })
-          .promise();
-      } else {
+        .promise();
+
+        if (getResp.Item) {
+          const marker = getResp.Item
+          const item = {
+            ...marker,
+            image_keys: [...marker.image_keys, image_key]
+          }
+
+          await dynamo
+            .put({
+              TableName: MARKER_DB,
+              Item: item
+            })
+            .promise();
+        } else {
+          const item = {
+            id: markerid,
+            latlng,
+            image_keys: [image_key],
+            creator,
+            email: key,
+          }
+          await dynamo
+            .put({
+              TableName: MARKER_DB,
+              Item: item
+            })
+            .promise();
+        }
+      } else if (type === "mem") {
         const item = {
-          id: markerid,
-          latlng,
-          image_keys: [image_key],
+          id: uuidv4(),
+          marker_id: markerid,
+          image_key,
           creator,
           email: key,
         }
         await dynamo
           .put({
-            TableName: MARKER_DB,
+            TableName: MEM_DB,
             Item: item
           })
           .promise();
@@ -116,6 +141,6 @@ exports.handler = async event => {
     }
   }
   catch (err) {
-    return "Error validating object"
+    return "Error validatingobject"
   }
 };

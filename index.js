@@ -24,7 +24,7 @@ exports.handler = async (event) => {
       .getObject(params)
       .promise();
 
-    const image_id = Metadata.imageId;
+    const imageKey = Metadata.imageKey;
 
     const mimeType = await fileType.fromBuffer(Body);
     if (!validMimeType(ContentType) || !validMimeType(mimeType.mime)) {
@@ -37,9 +37,8 @@ exports.handler = async (event) => {
       const getresp = await s3.getObject(getparams).promise();
       const raw_img = getresp.Body;
 
-      const image_key = `${image_id}.webp`;
-      // const image_key_md = `${image_id}_md.webp`
-      // const image_key_sm = `${image_id}_sm.webp`
+      // const imageKey_md = `${image_id}_md.webp`
+      // const imageKey_sm = `${image_id}_sm.webp`
 
       let webp_image;
       if (mimeType.mime !== "image/webp") {
@@ -54,7 +53,7 @@ exports.handler = async (event) => {
         s3
           .putObject({
             Bucket: VALID_BUCKET,
-            Key: image_key,
+            Key: imageKey,
             Body: webp_image,
             ContentType: "image/webp",
           })
@@ -63,7 +62,7 @@ exports.handler = async (event) => {
 
       // promises.push(s3.putObject({
       //   Bucket: VALID_BUCKET,
-      //   Key: image_key_md,
+      //   Key: imageKey_md,
       //   Body: await sharp(webp_image)
       //     .resize(350, undefined, {
       //       fit: sharp.fit.cover,
@@ -74,7 +73,7 @@ exports.handler = async (event) => {
 
       // promises.push(s3.putObject({
       //   Bucket: VALID_BUCKET,
-      //   Key: image_key_sm,
+      //   Key: imageKey_sm,
       //   Body: await sharp(webp_image)
       //     .resize(200, 200, {
       //       fit: sharp.fit.cover,

@@ -24,7 +24,7 @@ exports.handler = async (event) => {
       .getObject(params)
       .promise();
 
-    const imageKey = Metadata.imageKey;
+    const imageKey = Metadata.imagekey;
 
     const mimeType = await fileType.fromBuffer(Body);
     if (!validMimeType(ContentType) || !validMimeType(mimeType.mime)) {
@@ -34,6 +34,7 @@ exports.handler = async (event) => {
         Bucket: bucket,
         Key: key,
       };
+      
       const getresp = await s3.getObject(getparams).promise();
       const raw_img = getresp.Body;
 
@@ -85,6 +86,6 @@ exports.handler = async (event) => {
       await Promise.all(promises);
     }
   } catch (err) {
-    return "Error validatingobject";
+    return { err, c }
   }
 };

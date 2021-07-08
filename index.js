@@ -6,9 +6,9 @@ const sharp = require("sharp");
 const s3 = new aws.S3({ apiVersion: "2006-03-01" });
 
 const dynamo = new aws.DynamoDB.DocumentClient();
-const MARKER_DB = "memnut-markers";
-const MEMAGE_DB = "memnut-memages";
-const MEM_DB = "memnut-mems";
+const MARKER_DB = "memnut-marker-images";
+const MEMAGE_DB = "memnut-memage-images";
+const MEM_DB = "memnut-mem-images";
 const VALID_BUCKET = "memnut-valid-images";
 
 const validMimeType = (type) =>

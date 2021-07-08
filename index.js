@@ -105,17 +105,17 @@ exports.handler = async (event) => {
 
       if (type === "marker") {
         const markerid = Metadata.markerid;
-        item["marker_id"] = markerid;
+        item["id"] = markerid;
         db = MARKER_DB;
       } else if (type === "memage") {
         const memageid = Metadata.memageid;
-        item["memage_id"] = memageid;
+        item["id"] = memageid;
         db = MEMAGE_DB;
       } else if (type === "mem") {
         const memid = Metadata.memid;
         const memageid = Metadata.memageid;
+        item["id"] = memid;
         item["memage_id"] = memageid;
-        item["mem_id"] = memid;
         db = MEM_DB;
       }
 

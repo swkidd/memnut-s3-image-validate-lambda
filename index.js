@@ -1,20 +1,13 @@
 const aws = require("aws-sdk");
 const fileType = require("file-type");
-const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 
 const s3 = new aws.S3({ apiVersion: "2006-03-01" });
 
-const dynamo = new aws.DynamoDB.DocumentClient();
-const MARKER_DB = "memnut-marker-images";
-const MEMAGE_DB = "memnut-memage-images";
-const MEM_DB = "memnut-mem-images";
 const VALID_BUCKET = "memnut-valid-images";
 
 const validMimeType = (type) =>
   type === "image/jpeg" || type === "image/png" || type === "image/webp";
-const validType = (type) =>
-  type === "marker" || type === "mem" || type === "memage";
 
 exports.handler = async (event) => {
   const bucket = event.Records[0].s3.bucket.name;
@@ -31,15 +24,11 @@ exports.handler = async (event) => {
       .getObject(params)
       .promise();
 
-    const image_id = uuidv4();
-    const type = Metadata.type;
-    const creator = JSON.parse(Metadata.creator);
+    const image_id = Metadata.imageId;
 
     const mimeType = await fileType.fromBuffer(Body);
     if (!validMimeType(ContentType) || !validMimeType(mimeType.mime)) {
       throw new Error("Invalid upload mime type");
-    } else if (!validType(type)) {
-      throw new Error("Invalid upload type");
     } else {
       var getparams = {
         Bucket: bucket,
@@ -95,36 +84,6 @@ exports.handler = async (event) => {
       // }).promise());
 
       await Promise.all(promises);
-
-      let db;
-      const item = {
-        image_key,
-        creator,
-        email: key,
-      };
-
-      if (type === "marker") {
-        const markerid = Metadata.markerid;
-        item["id"] = markerid;
-        db = MARKER_DB;
-      } else if (type === "memage") {
-        const memageid = Metadata.memageid;
-        item["id"] = memageid;
-        db = MEMAGE_DB;
-      } else if (type === "mem") {
-        const memid = Metadata.memid;
-        const memageid = Metadata.memageid;
-        item["id"] = memid;
-        item["memage_id"] = memageid;
-        db = MEM_DB;
-      }
-
-      await dynamo
-        .put({
-          TableName: db,
-          Item: item,
-        })
-        .promise();
     }
   } catch (err) {
     return "Error validatingobject";
